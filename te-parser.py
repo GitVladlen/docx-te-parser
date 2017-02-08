@@ -1,4 +1,4 @@
-﻿import docx2txt
+import docx2txt
 
 def delete_comments(lines):
 	result = []
@@ -14,7 +14,34 @@ def delete_comments(lines):
 		result.append(line)
 	return result
 
+def get_value(keyword, line):
+	start_index = line.find(keyword) + len(keyword) + 2
+	part_line = line[start_index:].split(" ")
+	
+	words = []
+	
+	for word in part_line:
+		if ":" in word:
+			break
+		words.append(word)
+	
+	value = " ".join(words)
+
+	
+	return value
+	pass
+	
+def occurrence_check(value):
+	if value == "Resets":
+		return "self.OCCURRENCE_RESETS"
+	pass
+	
+def levels_check(value):
+	values = [int(_) for _ in value.split(" ")]
+	return "range({}, {})".format(values[0], values[1] + 1)
+	
 def parse(text, file_name):
+	text = text.encode('utf-8')
 	lines = text.split("\n\n")
 	lines = delete_comments(lines)
 	
@@ -25,27 +52,54 @@ class TextEncounter{ID}(TextEncounter):
 	def __init__(self):
 		super(TextEncounter{ID}, self).__init__()
 		self.id = "{ID}"
+		self.name = "{Name}"
+		self.priority = {Priority}
+		self.occurrence = {Occurrence}
+		self.frequency = {Frequency}
+		
+		self.planet = "{Planet}"
+		self.levels = {Levels}
 		pass
 	def _onCheckConditions(self, context):
 		return True
 		pass
 	def _onGenerate(self, context, dialog):
-		{dialog}
 		pass
 	pass
 """
-	params = {}
-	keywords = ["ID:", "Planet:"]
+	params = dict(
+		ID=None,
+		Name=None,
+		Priority=None,
+		Occurrence=None,
+		Frequency=None,
+		Planet=None,
+		Levels=None,
+	)
+	keywords = dict(
+		ID=str,
+		Name=str,
+		Priority=int,
+		Occurrence=occurrence_check,
+		Frequency=int,
+		Planet=str,
+		Levels=levels_check,
+	)
 	
 	for line in lines:
 		words = line.split(" ")
 		
-		for index, word in enumerate(words):
-			if word in keywords:
-				keyword = word[:-1]
-				params[keyword] = words[index + 1]
+		for word in words:
+			if ":" not in word:
+				continue
+			keyword = word[:-1]
+			
+			if keyword not in keywords:
+				continue
+				
+			handler = keywords[keyword]
+			params[keyword] = handler(get_value(keyword, line))
 	
-	params["dialog"] = "dialog.text = \"ID_TE_Text\""
 	
 	result = result.format(**params)
 	
