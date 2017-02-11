@@ -1,6 +1,6 @@
 # docx-te-parser
 Tool for exporting TEs from .docx to Mengine.
-Functionality:
+# Functionality:
 1. extract TE text from .docx file
 2. create python script
 3. create xml with Text resources
