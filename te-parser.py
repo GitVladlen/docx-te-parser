@@ -213,9 +213,9 @@ if __name__ == '__main__':
     # setup file names
     import os
     dir = os.path.dirname(__file__)
-    docx_file_name = os.path.join(dir, "te-format.docx")
-    result_txt_file_name = os.path.join(dir, "docx-to-text-result.txt")
-    result_script_file_name = os.path.join(dir, "text-to-script-result.py")
+    docx_file_name = os.path.join(dir, "debug/te-format.docx")
+    result_txt_file_name = os.path.join(dir, "debug/docx-to-text-result.txt")
+    result_script_file_name = os.path.join(dir, "debug/text-to-script-result.py")
     
     # gain text from docx
     text = docx2txt.process(docx_file_name)
