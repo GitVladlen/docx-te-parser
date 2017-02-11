@@ -1,3 +1,4 @@
+import os
 import docx2txt
 
 script_format = """from TextEncounter import TextEncounter
@@ -18,6 +19,12 @@ class TextEncounter{ID}(TextEncounter):
     def _onGenerate(self, context, dialog):{Dialog}
         pass
     pass
+"""
+
+texts_format = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Texts>
+    {Texts}
+</Texts>
 """
 
 text_id_format = "<Text Key=\"{key}\" Value=\"{value}\"/>"
@@ -83,10 +90,31 @@ def parse_nodes(text):
     return nodes
     pass
 
-def write_script(text, file_name):
+def write_script(script_text, dir_path, te_id):
     """Write python script"""
-    with open(file_name, "w") as f:
-        f.write(text)
+    # do full file path
+    file_name = "TextEncounter{ID}.py".format(ID=te_id)
+    path = os.path.join(dir_path, file_name)
+    print path
+    # write
+    with open(path, "w") as f:
+        f.write(script_text)
+        pass
+    pass
+
+def write_texts(all_texts, dir_path):
+    file_name = "Texts.xml"
+    path = os.path.join(dir_path, file_name)
+    print path
+    all_texts_str_list = []
+    for texts in all_texts:
+        texts_str = "\n\t".join(map(lambda text: text_id_format.format(**text), texts))
+        all_texts_str_list.append(texts_str)
+    all_texts_str = "\n\n\t".join(all_texts_str_list)
+
+    texts_to_write = texts_format.format(Texts=all_texts_str)
+    with open(path, "w") as f:
+        f.write(texts_to_write)
         pass
     pass
 
@@ -106,10 +134,27 @@ def add_debug_text(script_text, nodes, texts):
     return full_text
     pass
 
-# ----------------------- PARSE -----------------------
-def parse(text, file_name):
-    nodes = parse_nodes(text)
+def split_encounters(nodes):
+    result = []
+    cur_nodes = []
+    for node in nodes:
+        tag, _ = node
+        
+        if tag == "ID":
+            if cur_nodes:
+                result.append(cur_nodes)
+            cur_nodes = []
 
+        cur_nodes.append(node)
+
+    if cur_nodes:
+        result.append(cur_nodes)
+
+    # print "".join(map(lambda (index, nodes): "{}. {}\n\n".format(index, nodes), enumerate(result)))
+    return result
+    pass
+
+def get_data(nodes):
     params = dict(
         ID="000",
         Name="NoName",
@@ -203,19 +248,32 @@ def parse(text, file_name):
     script_text = script_format.format(**params)
     # add debug text
     script_text = add_debug_text(script_text, nodes, texts)
-    # dummy write
-    write_script(script_text, file_name)
+    return params["ID"], script_text, texts
+    pass
+
+# ----------------------- PARSE -----------------------
+def parse(text, dir_path):
+    all_nodes = parse_nodes(text)
+    data = split_encounters(all_nodes)
+    all_texts = []
+    for nodes in data:
+        te_id, script_text, texts = get_data(nodes)
+        # accumulate all texts
+        all_texts.append(texts)
+        # dummy write
+        write_script(script_text, dir_path, te_id)
+        pass
+    write_texts(all_texts, dir_path)
     pass
 # -----------------------------------------------------
 
 # debug tests
 if __name__ == '__main__':
     # setup file names
-    import os
-    dir = os.path.dirname(__file__)
-    docx_file_name = os.path.join(dir, "debug/te-format.docx")
-    result_txt_file_name = os.path.join(dir, "debug/docx-to-text-result.txt")
-    result_script_file_name = os.path.join(dir, "debug/text-to-script-result.py")
+    dir_path = os.path.dirname(__file__)
+    docx_file_name = os.path.join(dir_path, "debug/te-format.docx")
+    result_txt_file_name = os.path.join(dir_path, "debug/docx-to-text-result.txt")
+    result_script_path = os.path.join(dir_path, "debug/")
     
     # gain text from docx
     text = docx2txt.process(docx_file_name)
@@ -224,5 +282,5 @@ if __name__ == '__main__':
     with open(result_txt_file_name, "w") as file:
         file.write(text)
     # text parsing text and creating script file
-    parse(text, result_script_file_name)
+    parse(text, result_script_path)
     pass
