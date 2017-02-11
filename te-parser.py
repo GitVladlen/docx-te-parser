@@ -210,12 +210,19 @@ def parse(text, file_name):
 
 # debug tests
 if __name__ == '__main__':
+    # setup file names
+    import os
+    dir = os.path.dirname(__file__)
+    docx_file_name = os.path.join(dir, "te-format.docx")
+    result_txt_file_name = os.path.join(dir, "docx-to-text-result.txt")
+    result_script_file_name = os.path.join(dir, "text-to-script-result.py")
+    
     # gain text from docx
-    text = docx2txt.process("D:\\Python-Projects\\docx-to-text\\te-format.docx")
+    text = docx2txt.process(docx_file_name)
     text = text.encode('utf-8')
     # write text to txt file, for debug
-    with open("D:\\Python-Projects\\docx-to-text\\docx-to-text-result.txt", "w") as file:
+    with open(result_txt_file_name, "w") as file:
         file.write(text)
     # text parsing text and creating script file
-    parse(text, "D:\\Python-Projects\\docx-to-text\\text-to-script-result.py")
+    parse(text, result_script_file_name)
     pass
