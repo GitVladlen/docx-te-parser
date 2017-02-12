@@ -1,6 +1,22 @@
+import sys
 import os
 import docx2txt
 
+import argparse
+
+def process_args():
+    parser = argparse.ArgumentParser(
+        description="Export Text Encounter from docx file to Mengine"
+        )
+    parser.add_argument("docx", help="path of the docx file")
+    parser.add_argument("dest", help="path of destination directory")
+
+    args = parser.parse_args()
+        
+    return args
+    pass
+
+# ---------------------------- FORMAT STRINGS ----------------------------
 script_format = """from TextEncounter import TextEncounter
 
 
@@ -29,7 +45,7 @@ texts_format = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 
 text_id_format = "<Text Key=\"{key}\" Value=\"{value}\"/>"
 
-# utils for parsing
+# -------------------------------- UTILS --------------------------------
 def delete_comments(lines):
     """Clear text from comments like //comment"""
     result = []
@@ -134,7 +150,7 @@ def add_debug_text(script_text, nodes, texts):
     return full_text
     pass
 
-def split_encounters(nodes):
+def split_nodes_by_encounters(nodes):
     result = []
     cur_nodes = []
     for node in nodes:
@@ -154,7 +170,7 @@ def split_encounters(nodes):
     return result
     pass
 
-def get_data(nodes):
+def parse_data(nodes):
     params = dict(
         ID="000",
         Name="NoName",
@@ -251,36 +267,65 @@ def get_data(nodes):
     return params["ID"], script_text, texts
     pass
 
-# ----------------------- PARSE -----------------------
-def parse(text, dir_path):
+def process_text(text, dir_path):
+    # get nodes from text
     all_nodes = parse_nodes(text)
-    data = split_encounters(all_nodes)
+    nodes_by_encounters = split_nodes_by_encounters(all_nodes)
+    # transform nodes to files
     all_texts = []
-    for nodes in data:
-        te_id, script_text, texts = get_data(nodes)
+    for nodes in nodes_by_encounters:
+        te_id, script_text, texts = parse_data(nodes)
         # accumulate all texts
         all_texts.append(texts)
-        # dummy write
+        # write python script
         write_script(script_text, dir_path, te_id)
         pass
+    # write xml file with text resources
     write_texts(all_texts, dir_path)
     pass
-# -----------------------------------------------------
 
-# debug tests
-if __name__ == '__main__':
-    # setup file names
-    dir_path = os.path.dirname(__file__)
-    docx_file_name = os.path.join(dir_path, "debug/te-format.docx")
-    result_txt_file_name = os.path.join(dir_path, "debug/docx-to-text-result.txt")
-    result_script_path = os.path.join(dir_path, "debug/")
-    
+# ----------------------- USE THIS -----------------------
+def process_docx(docx_file_path, destination_dir):
     # gain text from docx
-    text = docx2txt.process(docx_file_name)
+    text = docx2txt.process(docx_file_path)
     text = text.encode('utf-8')
+
     # write text to txt file, for debug
+    result_txt_file_name = os.path.join(destination_dir, "docx-to-text-result.txt")
     with open(result_txt_file_name, "w") as file:
         file.write(text)
+
     # text parsing text and creating script file
-    parse(text, result_script_path)
+    process_text(text, destination_dir)
+    pass
+# --------------------------------------------------------
+if __name__ == '__main__':
+    # setup default file names
+    cur_dir_path = os.path.dirname(__file__)
+    destination_dir = os.path.join(cur_dir_path, "debug/")
+    docx_file_name = os.path.join(destination_dir, "te-format.docx")
+
+    # todo: fix process args
+    # check console args
+    # args = process_args()
+    # print "Command line arguments: {}".format(args)
+    # if args.docx is not None and args.dest is None:
+    #     if not os.path.exists(args.docx):
+    #         print("File {} dose not exist.".format(args.docx))
+    #         sys.exit(1)
+    #         pass
+    #     if not os.path.exists(args.dest):
+    #         try:
+    #             os.makedirs(args.dest)
+    #         except OSError:
+    #             print("Unable to create destination dir {}".format(args.dest))
+    #             sys.exit(1)
+    #         pass
+        
+    #     docx_file_name = args.docx
+    #     destination_dir = args.dest
+    #     pass
+    # execute
+
+    process_docx(docx_file_name, destination_dir)
     pass
