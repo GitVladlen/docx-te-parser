@@ -267,6 +267,118 @@ def parse_data(nodes):
     return params["ID"], script_text, texts
     pass
 
+def get_id_from_nodes(nodes):
+    for tag, value in nodes:
+        if tag == "ID":
+            return value
+    return None
+
+def parse_data_experiment(nodes):
+    script_format = """from TextEncounter import TextEncounter
+
+
+class TextEncounter{ID}(TextEncounter):
+    def __init__(self):
+        super(TextEncounter{ID}, self).__init__(){InitParams}
+        pass
+
+    def _onCheckConditions(self, context):{CheckConditions}
+        pass
+
+    def _onGenarete(self, context, dialog):{GenerateDialog}
+        pass
+    pass
+"""
+    te_id = get_id_from_nodes(nodes)
+
+    params = dict(
+        ID=te_id,
+        InitParams="",
+        CheckConditions="",
+        GenerateDialog="",
+    )
+
+    indentation = "        "
+    entity = "self"
+
+    option_index = 0
+    outcome_index = 0
+
+    def rule_strip_space(params, key, tag, indentaion, entity, value, format_string):
+        value = value.strip(" ")
+        params[key] += format_string.format(
+            indentation=indentation,
+            entity=entity,
+            value=value,
+        )
+        return entity
+        pass
+
+    def rule_id(params, key, tag, indentaion, entity, value, format_string):
+        params["ID"] = value.strip(" ")
+        return rule_strip_space(params, key, tag, indentation, entity, value, format_string)
+        pass
+
+    def rule_levels(params, key, tag, indentation, entity, value, format_string):
+        from_level, to_level = map(int, (value.strip(" ")).split(" "))
+        if from_level < 0 or to_level < 0:
+            print "Invalid Levels in {ID}".format(**params)
+            return entity
+        value = "range({}, {})".format(from_level, to_level + 1)
+        return rule_strip_space(params, key, tag, indentation, entity, value, format_string)
+        pass
+
+    def rule_conditions(params, key, tag, indentation, entity, value, format_string):
+        return "conditions"
+        pass
+
+    def rule_mech1_conditions(params, key, tag, indentation, entity, value, format_string):
+        print "mech1 conditions entity=\'{}\' value=\'{}\'".format(entity, value)
+        params["InitParams"] += "\n{}# {} = {}".format(indentation, tag, value)
+        return entity
+        pass 
+
+    def rule_mech1_outcome(params, key, tag, indentation, entity, value, format_string):
+        print "mech1 outcome entity=\'{}\' value=\'{}\'".format(entity, value)
+        params["GenerateDialog"] += "\n{}# {} = {}".format(indentation, tag, value)
+        return entity
+        pass 
+
+    def rule_outcome(params, key, tag, indentation, entity, value, format_string):
+        return "outcome"
+        pass
+
+    rules = dict(
+        ID=(rule_id, "InitParams", "\n{indentation}{entity}.id = \"{value}\""),
+        Name=(rule_strip_space, "InitParams", "\n{indentation}{entity}.name = \"{value}\""),
+        Conditions=(rule_conditions, None, None),
+        Levels=(rule_levels, "InitParams", "\n{indentation}{entity}.levels = {value}"),
+        Mech1=dict(
+            conditions=(rule_mech1_conditions, None, None),
+            outcome=(rule_mech1_outcome, None, None),
+        ),
+        Outcome=(rule_outcome, None, None),
+    )
+
+    for tag, value in nodes:
+        rule = rules.get(tag)
+        if rule is None:
+            print "There are no rule for tag {}".format(tag)
+            continue    
+        if isinstance(rule, dict) is True:
+            rule = rule.get(entity)
+        if rule is None:
+            print "There are no rule for tag {} in entity {}".format(tag, entity)
+            continue
+        action, key, format_string = rule
+        entity = action(params, key, tag, indentation, entity, value, format_string)
+        pass
+
+    script_text = script_format.format(**params)
+
+    return params["ID"], script_text, []
+    pass
+
 def process_text(text, dir_path):
     # get nodes from text
     all_nodes = parse_nodes(text)
@@ -275,6 +387,7 @@ def process_text(text, dir_path):
     all_texts = []
     for nodes in nodes_by_encounters:
         te_id, script_text, texts = parse_data(nodes)
+        # te_id, script_text, texts = parse_data_experiment(nodes)
         # accumulate all texts
         all_texts.append(texts)
         # write python script
