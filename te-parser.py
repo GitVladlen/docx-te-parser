@@ -418,6 +418,19 @@ if __name__ == '__main__':
     destination_dir = os.path.join(cur_dir_path, "debug/")
     docx_file_name = os.path.join(destination_dir, "te-format.docx")
 
+    if not os.path.exists(docx_file_name):
+        print("File {} dose not exist.".format(docx_file_name))
+        sys.exit(1)
+        pass
+
+    if not os.path.exists(destination_dir):
+        try:
+            os.makedirs(destination_dir)
+        except OSError:
+            print("Unable to create destination dir {}".format(destination_dir))
+            sys.exit(1)
+        pass
+
     # todo: fix process args
     # check console args
     # args = process_args()
