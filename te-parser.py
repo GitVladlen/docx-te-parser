@@ -1,7 +1,7 @@
 import sys
 import os
 import docx2txt
-
+import re
 import argparse
 
 def process_args():
@@ -296,6 +296,9 @@ class TextEncounter{ID}(TextEncounter):
         InitParams="",
         CheckConditions="",
         GenerateDialog="",
+        Texts=[],
+        OptionIndex=0,
+        OutcomeIndex=0,
     )
 
     indentation = "        "
@@ -320,6 +323,7 @@ class TextEncounter{ID}(TextEncounter):
         pass
 
     def rule_levels(params, key, tag, indentation, entity, value, format_string):
+        print "MATCH", re.findall(r'\d\s+\d', str(value))
         from_level, to_level = map(int, (value.strip(" ")).split(" "))
         if from_level < 0 or to_level < 0:
             print "Invalid Levels in {ID}".format(**params)
@@ -329,35 +333,192 @@ class TextEncounter{ID}(TextEncounter):
         pass
 
     def rule_conditions(params, key, tag, indentation, entity, value, format_string):
-        return "conditions"
+        if entity != "self":
+            return "conditions"
+        return entity
         pass
 
     def rule_mech1_conditions(params, key, tag, indentation, entity, value, format_string):
-        print "mech1 conditions entity=\'{}\' value=\'{}\'".format(entity, value)
-        params["InitParams"] += "\n{}# {} = {}".format(indentation, tag, value)
+        params["CheckConditions"] += "\n{indentation}# {entity}.mech1 = {value}".format(
+            indentation=indentation,
+            entity=entity,
+            value=value,
+        )
         return entity
         pass 
 
     def rule_mech1_outcome(params, key, tag, indentation, entity, value, format_string):
-        print "mech1 outcome entity=\'{}\' value=\'{}\'".format(entity, value)
-        params["GenerateDialog"] += "\n{}# {} = {}".format(indentation, tag, value)
+        params["GenerateDialog"] += "\n{indentation}# {entity}.mech1 = {value}".format(
+            indentation=indentation,
+            entity=entity,
+            value=value,
+        )
         return entity
-        pass 
+        pass
+
+    def rule_mech2_conditions(params, key, tag, indentation, entity, value, format_string):
+        params["CheckConditions"] += "\n{indentation}# {entity}.mech2 = {value}".format(
+            indentation=indentation,
+            entity=entity,
+            value=value,
+        )
+        return entity
+        pass
+
+    def rule_mech2_outcome(params, key, tag, indentation, entity, value, format_string):
+        params["GenerateDialog"] += "\n{indentation}# {entity}.mech2 = {value}".format(
+            indentation=indentation,
+            entity=entity,
+            value=value,
+        )
+        return entity
+        pass
+
+    def rule_int(params, key, tag, indentation, entity, value, format_string):
+        value = int(value)
+        params[key] += format_string.format(
+            indentation=indentation,
+            entity=entity,
+            value=value,
+        )
+        return entity
+        pass
+
+    def rule_occurrence(params, key, tag, indentation, entity, value, format_string):
+        # do this stuff with regex
+        if value == "Resets":
+            value = "self.OCCURRENCE_RESETS"
+        else:
+            return entity
+        return rule_strip_space(params, key, tag, indentation, entity, value, format_string)
+        pass
+
+    def rule_cargo(params, key, tag, indentation, entity, value, format_string):
+        params["CheckConditions"] += "\n{indentation}# {entity}.cargo = {value}".format(
+            indentation=indentation,
+            entity=entity,
+            value=value,
+        )
+        return entity
+        pass
+
+    def rule_dialog(params, key, tag, indentation, entity, value, format_string):
+        entity = "dialog"
+        if value:
+            text_id = "ID_TE_{ID}_Dialog".format(**params)
+            params["Texts"].append(dict(key=text_id, value=value))
+            value = text_id
+            params[key] += format_string.format(
+                indentation=indentation,
+                entity=entity,
+                value=value,
+            )
+        return entity
+        pass
+
+    def rule_option(params, key, tag, indentation, entity, value, format_string):
+        params[key] += "\n\n{indentation}option = dialog.option()".format(
+            indentation=indentation,
+            entity=entity,
+            value=value,
+        )
+        entity = "option"
+
+        if value:
+            text_id = "ID_TE_{ID}_Option_{OptionIndex}".format(**params)
+            params["Texts"].append(dict(key=text_id, value=value))
+            params["OptionIndex"] += 1
+            value = text_id
+            params[key] += "\n{indentation}{entity}.text = \"{value}\"".format(
+                indentation=indentation,
+                entity=entity,
+                value=value,
+            )
+            pass
+
+        return entity
+        pass
 
     def rule_outcome(params, key, tag, indentation, entity, value, format_string):
-        return "outcome"
+        if params["OptionIndex"] > 0:
+            entity = "option"
+            pass
+        params[key] += "\n\n{indentation}outcome = {entity}.outcome()".format(
+            indentation=indentation,
+            entity=entity,
+            value=value,
+        )
+        entity = "outcome"
+
+        if value:
+            text_id = "ID_TE_{ID}_Outcome_{OutcomeIndex}".format(**params)
+            params["Texts"].append(dict(key=text_id, value=value))
+            params["OutcomeIndex"] += 1
+            value = text_id
+            params[key] += "\n{indentation}{entity}.text = \"{value}\"".format(
+                indentation=indentation,
+                entity=entity,
+                value=value,
+            )
+            pass
+
+        return entity
+        pass
+
+    def rule_gips(params, key, tag, indentation, entity, value, format_string):
+        try:
+            int_value = int(value)
+            value = int_value
+            params[key] += "\n{indentation}{entity}.gips = {value}".format(
+                indentation=indentation,
+                entity=entity,
+                value=value,
+            )
+        except ValueError:
+            params[key] += "\n{indentation}# {entity}.gips  = {value}".format(
+                indentation=indentation,
+                entity=entity,
+                value=value,
+            )
+
+        return entity
+        pass
+
+    def rule_items(params, key, tag, indentation, entity, value, format_string):
+        params[key] += format_string.format(
+            indentation=indentation,
+            entity=entity,
+            value="\"{}\"  # dummy".format(value),
+        )
+        return entity
         pass
 
     rules = dict(
         ID=(rule_id, "InitParams", "\n{indentation}{entity}.id = \"{value}\""),
         Name=(rule_strip_space, "InitParams", "\n{indentation}{entity}.name = \"{value}\""),
         Conditions=(rule_conditions, None, None),
+        Planet=(rule_strip_space, "InitParams", "\n{indentation}{entity}.planet = \"{value}\""),
         Levels=(rule_levels, "InitParams", "\n{indentation}{entity}.levels = {value}"),
+        Priority=(rule_int, "InitParams", "\n{indentation}{entity}.priority = {value}"),
+        Occurrence=(rule_occurrence, "InitParams", "\n{indentation}{entity}.occurrence = {value}"),
+        Frequency=(rule_int, "InitParams", "\n{indentation}{entity}.frequency = {value}"),
         Mech1=dict(
+            self=(rule_mech1_conditions, None, None),
             conditions=(rule_mech1_conditions, None, None),
             outcome=(rule_mech1_outcome, None, None),
         ),
-        Outcome=(rule_outcome, None, None),
+        Mech2=dict(
+            self=(rule_mech2_conditions, None, None),
+            conditions=(rule_mech2_conditions, None, None),
+            outcome=(rule_mech2_outcome, None, None),
+        ),
+        Cargo=(rule_cargo, None, None),
+        Dialog=(rule_dialog, "GenerateDialog", "\n{indentation}{entity}.text = \"{value}\""),
+        Option=(rule_option, "GenerateDialog", None),
+        Outcome=(rule_outcome, "GenerateDialog", None),
+        Chance=(rule_int, "GenerateDialog", "\n{indentation}{entity}.chance = {value}"),
+        Gips=(rule_gips, "GenerateDialog", "\n{indentation}{entity}.gips = {value}"),
+        Items=(rule_items, "GenerateDialog", "\n{indentation}{entity}.items = {value}")
     )
 
     for tag, value in nodes:
@@ -376,7 +537,7 @@ class TextEncounter{ID}(TextEncounter):
 
     script_text = script_format.format(**params)
 
-    return params["ID"], script_text, []
+    return params["ID"], script_text, params["Texts"]
     pass
 
 def process_text(text, dir_path):
@@ -386,8 +547,8 @@ def process_text(text, dir_path):
     # transform nodes to files
     all_texts = []
     for nodes in nodes_by_encounters:
-        te_id, script_text, texts = parse_data(nodes)
-        # te_id, script_text, texts = parse_data_experiment(nodes)
+        # te_id, script_text, texts = parse_data(nodes)
+        te_id, script_text, texts = parse_data_experiment(nodes)
         # accumulate all texts
         all_texts.append(texts)
         # write python script
