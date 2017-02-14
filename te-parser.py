@@ -283,6 +283,7 @@ class TextEncounter{ID}(TextEncounter):
         pass
 
     def _onCheckConditions(self, context):{CheckConditions}
+        return True
         pass
 
     def _onGenarete(self, context, dialog):{GenerateDialog}
@@ -323,11 +324,19 @@ class TextEncounter{ID}(TextEncounter):
         pass
 
     def rule_levels(params, key, tag, indentation, entity, value, format_string):
-        print "MATCH", re.findall(r'\d\s+\d', str(value))
-        from_level, to_level = map(int, (value.strip(" ")).split(" "))
+        match_two_digits = re.match(r'\s*(\d+)\s+(\d+)\s*', str(value))
+        match_one_digit = re.match(r'\s*(\d+)\s*', str(value))
+
+        from_level, to_level = None, None
+        if match_two_digits:
+            from_level, to_level = map(int, match_two_digits.groups())
+        elif match_one_digit:
+            from_level = to_level = int(match_one_digit.group())
+
         if from_level < 0 or to_level < 0:
             print "Invalid Levels in {ID}".format(**params)
             return entity
+
         value = "range({}, {})".format(from_level, to_level + 1)
         return rule_strip_space(params, key, tag, indentation, entity, value, format_string)
         pass
@@ -339,11 +348,21 @@ class TextEncounter{ID}(TextEncounter):
         pass
 
     def rule_mech1_conditions(params, key, tag, indentation, entity, value, format_string):
-        params["CheckConditions"] += "\n{indentation}# {entity}.mech1 = {value}".format(
-            indentation=indentation,
-            entity=entity,
-            value=value,
-        )
+        matches = re.findall(r'(HP|TAP|HE)\s*(>|>=|<|<=|==|!=)\s*(\d+)', str(value))
+
+        if matches:
+            format_string = "\n{indentation}if not context.mech1.{stat} {operator} {number}:\n{indentation}    return False"
+            for stat, operator, number in matches:
+                bones = dict(
+                    stat=stat.lower(),
+                    indentation=indentation,
+                    operator=operator,
+                    number=number,
+                )
+                params["CheckConditions"] += format_string.format(**bones)
+                pass
+            pass
+
         return entity
         pass 
 
@@ -357,11 +376,20 @@ class TextEncounter{ID}(TextEncounter):
         pass
 
     def rule_mech2_conditions(params, key, tag, indentation, entity, value, format_string):
-        params["CheckConditions"] += "\n{indentation}# {entity}.mech2 = {value}".format(
-            indentation=indentation,
-            entity=entity,
-            value=value,
-        )
+        matches = re.findall(r'(HP|TAP|HE)\s*(>|>=|<|<=|==|!=)\s*(\d+)', str(value))
+        if matches:
+            format_string = "\n{indentation}if not context.mech1.{stat} {operator} {number}:\n{indentation}    return False"
+            for stat, operator, number in matches:
+                bones = dict(
+                    stat=stat.lower(),
+                    indentation=indentation,
+                    operator=operator,
+                    number=number,
+                )
+                params["CheckConditions"] += format_string.format(**bones)
+                pass
+            pass
+
         return entity
         pass
 
@@ -375,22 +403,37 @@ class TextEncounter{ID}(TextEncounter):
         pass
 
     def rule_int(params, key, tag, indentation, entity, value, format_string):
-        value = int(value)
-        params[key] += format_string.format(
-            indentation=indentation,
-            entity=entity,
-            value=value,
-        )
+        match = re.match(r'(\d+)', str(value))
+
+        if match:
+            value = int(value)
+            params[key] += format_string.format(
+                indentation=indentation,
+                entity=entity,
+                value=value,
+            )
         return entity
         pass
 
     def rule_occurrence(params, key, tag, indentation, entity, value, format_string):
-        # do this stuff with regex
-        if value == "Resets":
-            value = "self.OCCURRENCE_RESETS"
-        else:
-            return entity
-        return rule_strip_space(params, key, tag, indentation, entity, value, format_string)
+
+        match = re.match(r'(Reccuring|Resets|Until completed|Once only)', str(value))
+
+        if match:
+            bones = {
+                "Reccuring": "self.OCCURRENCE_RECCURING",
+                "Resets": "self.OCCURRENCE_RESETS",
+                "Until completed": "self.OCCURRENCE_UNTIL_COMPLETED",
+                "Once only": "self.OCCURRENCE_ONCE_ONLY",
+            }
+            value = bones[match.group(1)]
+            params[key] += format_string.format(
+                indentation=indentation,
+                entity=entity,
+                value=value,
+            )
+
+        return entity
         pass
 
     def rule_cargo(params, key, tag, indentation, entity, value, format_string):
@@ -466,16 +509,20 @@ class TextEncounter{ID}(TextEncounter):
         pass
 
     def rule_gips(params, key, tag, indentation, entity, value, format_string):
-        try:
-            int_value = int(value)
-            value = int_value
+        rand_match = re.match(r'rand\s*[+-]?(\d+)\s+[+-]?(\d+)', str(value))
+        int_match = re.match(r'[+-]?(\d+)', str(value))
+        if rand_match:
+            from_, to_ = rand_match.groups()
+            value = "self.rand({}, {})".format(from_, to_)
             params[key] += "\n{indentation}{entity}.gips = {value}".format(
                 indentation=indentation,
                 entity=entity,
                 value=value,
             )
-        except ValueError:
-            params[key] += "\n{indentation}# {entity}.gips  = {value}".format(
+        elif int_match:
+            int_value = int_match.group(1)
+            value = int_value
+            params[key] += "\n{indentation}{entity}.gips = {value}".format(
                 indentation=indentation,
                 entity=entity,
                 value=value,
@@ -524,7 +571,7 @@ class TextEncounter{ID}(TextEncounter):
     for tag, value in nodes:
         rule = rules.get(tag)
         if rule is None:
-            print "There are no rule for tag {}".format(tag)
+            # print "There are no rule for tag {}".format(tag)
             continue    
         if isinstance(rule, dict) is True:
             rule = rule.get(entity)
@@ -536,6 +583,8 @@ class TextEncounter{ID}(TextEncounter):
         pass
 
     script_text = script_format.format(**params)
+
+    script_text = add_debug_text(script_text, nodes, params["Texts"])
 
     return params["ID"], script_text, params["Texts"]
     pass
