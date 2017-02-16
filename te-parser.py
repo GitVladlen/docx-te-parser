@@ -58,8 +58,15 @@ def delete_comments(lines):
         if not line:
             continue
         # add to result
-        result.append(str(line))
+        result.append(line.decode())
     return result
+
+def delete_comments_from_text(text):
+    lines = text.split(b'\n\n')
+    result = delete_comments(lines)
+
+    return ' '.join(result)
+    pass
 
 def get_tag(word):
     """Check word for tag"""
@@ -135,45 +142,23 @@ def parse_nodes2(text):
         "Scrap",
         "LoadTE",
     ]
-    # comments = re.findall(r'(?:(\/\/.*)\n)+', str(text))
-    # print (" COMMENTS ", comments)
-    # if comments:
-    #     for comment in comments:
-    #         text = text.replace(comment.encode(), b'', 1)
 
-    line_text_decoded = text.replace(b'\n\n', b'')
-    print ()
-    print (line_text_decoded)
+    text = delete_comments_from_text(text)
+
+    line_text_decoded = text.encode()
 
     bones = "|".join(tag_list)
 
     tags_regex = r'({}):'.format(bones)
-    print ()
-    print (" TAGS_REGEX ", tags_regex)
     tags = re.findall(tags_regex, line_text_decoded.decode())
-    print ()
-    print (" TAGS ", tags)
 
     values_regex = r'{}'.format(":(.*)".join(tags) + ":(.*)")
-    print ()
-    print (" VALUES_REGEX ", values_regex)
     value_matches = re.match(values_regex, line_text_decoded.decode())
     values = []
     if value_matches:
         values = value_matches.groups()
 
-    print ()
-    print (" VALUES ", values)
-
     nodes = list(zip(tags, values))
-    for node in nodes:
-        print (" NODE ", node)
-
-    with open("D:\\temp.txt", "w") as f:
-        f.write(line_text_decoded.decode())
-        f.write("\n--------\n")
-        f.write(str(values_regex))
-
     return nodes
     pass
 
@@ -236,7 +221,6 @@ def split_nodes_by_encounters(nodes):
     result = []
     cur_nodes = []
     for node in nodes:
-        print ("++++++++", node)
         tag, _ = node
         
         if tag == "ID":
@@ -576,7 +560,7 @@ class TextEncounter{ID}(TextEncounter):
         )
         entity = "outcome"
 
-        if value:
+        if value.strip():
             text_id = "ID_TE_{ID}_Outcome_{OutcomeIndex}".format(**params)
             params["Texts"].append(dict(key=text_id, value=value))
             params["OutcomeIndex"] += 1
@@ -662,7 +646,7 @@ class TextEncounter{ID}(TextEncounter):
             #print "There are no rule for tag {} in entity {}".format(tag, entity)
             continue
         action, key, format_string = rule
-        entity = action(params, key, tag, indentation, entity, value, format_string)
+        entity = action(params, key, tag, indentation, entity, value.strip(), format_string)
         pass
 
     script_text = script_format.format(**params)
@@ -708,14 +692,11 @@ def process_docx(docx_file_path, destination_dir):
 def parse_text(text):
     # get nodes from text
     all_nodes = parse_nodes2(text)
-    print ("***************", all_nodes)
     nodes_by_encounters = split_nodes_by_encounters(all_nodes)
-    print ("^^^^^^^^^^^^^^^^^^^", nodes_by_encounters)
     # transform nodes to files
     scripts = []
     all_texts = []
     for nodes in nodes_by_encounters:
-        print ("############", nodes)
         # te_id, script_text, texts = parse_data(nodes)
         te_id, script_text, texts = parse_data_experiment(nodes)
         # accumulate all texts
@@ -724,10 +705,9 @@ def parse_text(text):
         scripts.append((te_id, script_text))
         pass
     texts = format_texts(all_texts)
-    print ("@@@@@@@@@@@@@", scripts, texts)
     return scripts, texts
     pass
-	
+
 def process(docx_file_path):
     # gain text from docx
     text = docx2txt.process(docx_file_path)
