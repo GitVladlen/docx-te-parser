@@ -17,7 +17,7 @@ def process_args():
     pass
 
 # ---------------------------- FORMAT STRINGS ----------------------------
-script_format = """from TextEncounter import TextEncounter
+script_format = """from Game.TextEncounters.TextEncounter import TextEncounter
 
 
 class TextEncounter{ID}(TextEncounter):
@@ -51,21 +51,21 @@ def delete_comments(lines):
     result = []
     for line in lines:
         # delete comments from line
-        comment_index = line.find("//")
+        comment_index = line.find(b"//")
         if comment_index is not -1:
             line = line[:comment_index]
         # ignore empty line
         if not line:
             continue
         # add to result
-        result.append(line)
+        result.append(str(line))
     return result
 
 def get_tag(word):
     """Check word for tag"""
-    if word.count(":") != 1:
+    if word.count(b":") != 1:
         return None
-    if word.endswith(":") is False:
+    if word.endswith(b":") is False:
         return None
     return word[:-1]
 
@@ -73,10 +73,10 @@ def parse_nodes(text):
     """Parsing nodes from text
     node = tag, value
     """
-    lines = text.split("\n\n")
+    lines = text.split(b'\n\n')
     lines = delete_comments(lines)
 
-    word_delimiter = " "
+    word_delimiter = b" "
     args = []
     last_tag = None
 
@@ -87,13 +87,13 @@ def parse_nodes(text):
         for word in words:
             tag = get_tag(word)
             if tag is None:
-                args.append(word)
+                args.append(word.decode())
                 continue
 
             if last_tag is not None:
                 value = " ".join(args)
                 value = value.replace(" [br] ", "&#10;")
-                node = last_tag, value
+                node = last_tag.decode(), value
                 nodes.append(node)
 
                 args = []
@@ -106,12 +106,83 @@ def parse_nodes(text):
     return nodes
     pass
 
+def parse_nodes2(text):
+    """Parsing nodes from text
+    node = tag, value
+    """
+    tag_list = [
+        "ID",
+        "Name",
+        "Conditions",
+        "Planet",
+        "Stages",
+        "Stages",
+        "Priority",
+        "Occurrence",
+        "Frequency",
+        "Mech1",
+        "Mech2",
+        "Cargo",
+        "Dialog",
+        "Option",
+        "Outcome",
+        "Chance",
+        "Gips",
+        "Items",
+        "Combat",
+        "Enemy1",
+        "Enemy2",
+        "Scrap",
+        "LoadTE",
+    ]
+    # comments = re.findall(r'(?:(\/\/.*)\n)+', str(text))
+    # print (" COMMENTS ", comments)
+    # if comments:
+    #     for comment in comments:
+    #         text = text.replace(comment.encode(), b'', 1)
+
+    line_text_decoded = text.replace(b'\n\n', b'')
+    print ()
+    print (line_text_decoded)
+
+    bones = "|".join(tag_list)
+
+    tags_regex = r'({}):'.format(bones)
+    print ()
+    print (" TAGS_REGEX ", tags_regex)
+    tags = re.findall(tags_regex, line_text_decoded.decode())
+    print ()
+    print (" TAGS ", tags)
+
+    values_regex = r'{}'.format(":(.*)".join(tags) + ":(.*)")
+    print ()
+    print (" VALUES_REGEX ", values_regex)
+    value_matches = re.match(values_regex, line_text_decoded.decode())
+    values = []
+    if value_matches:
+        values = value_matches.groups()
+
+    print ()
+    print (" VALUES ", values)
+
+    nodes = list(zip(tags, values))
+    for node in nodes:
+        print (" NODE ", node)
+
+    with open("D:\\temp.txt", "w") as f:
+        f.write(line_text_decoded.decode())
+        f.write("\n--------\n")
+        f.write(str(values_regex))
+
+    return nodes
+    pass
+
 def write_script(script_text, dir_path, te_id):
     """Write python script"""
     # do full file path
     file_name = "TextEncounter{ID}.py".format(ID=te_id)
     path = os.path.join(dir_path, file_name)
-    print path
+    print(path)
     # write
     with open(path, "w") as f:
         f.write(script_text)
@@ -121,7 +192,7 @@ def write_script(script_text, dir_path, te_id):
 def write_texts(all_texts, dir_path):
     file_name = "Texts.xml"
     path = os.path.join(dir_path, file_name)
-    print path
+    print(path)
     all_texts_str_list = []
     for texts in all_texts:
         texts_str = "\n\t".join(map(lambda text: text_id_format.format(**text), texts))
@@ -134,6 +205,17 @@ def write_texts(all_texts, dir_path):
         pass
     pass
 
+def format_texts(all_texts):
+    all_texts_str_list = []
+    for texts in all_texts:
+        texts_str = "\n\t".join(map(lambda text: text_id_format.format(**text), texts))
+        all_texts_str_list.append(texts_str)
+    all_texts_str = "\n\n\t".join(all_texts_str_list)
+
+    texts_to_write = texts_format.format(Texts=all_texts_str)
+    return texts_to_write
+    pass
+
 def add_debug_text(script_text, nodes, texts):
     """Add debug text as multi line comment to script text"""
     debug_format = """{script}
@@ -144,7 +226,7 @@ def add_debug_text(script_text, nodes, texts):
 {texts}
 \"\"\"
 """
-    nodes_str = "\n".join(map(lambda (t, v): "{} = \"{}\"".format(t, v), nodes))
+    nodes_str = "\n".join(map(lambda node: "{} = \"{}\"".format(node[0], node[1]), nodes))
     texts_str = "\n".join(map(lambda text: text_id_format.format(**text), texts))
     full_text = debug_format.format(script=script_text, nodes=nodes_str, texts=texts_str)
     return full_text
@@ -154,6 +236,7 @@ def split_nodes_by_encounters(nodes):
     result = []
     cur_nodes = []
     for node in nodes:
+        print ("++++++++", node)
         tag, _ = node
         
         if tag == "ID":
@@ -274,7 +357,7 @@ def get_id_from_nodes(nodes):
     return None
 
 def parse_data_experiment(nodes):
-    script_format = """from TextEncounter import TextEncounter
+    script_format = """from Game.TextEncounters.TextEncounter import TextEncounter
 
 
 class TextEncounter{ID}(TextEncounter):
@@ -286,7 +369,7 @@ class TextEncounter{ID}(TextEncounter):
         return True
         pass
 
-    def _onGenarete(self, context, dialog):{GenerateDialog}
+    def _onGenerate(self, context, dialog):{GenerateDialog}
         pass
     pass
 """
@@ -334,7 +417,7 @@ class TextEncounter{ID}(TextEncounter):
             from_level = to_level = int(match_one_digit.group())
 
         if from_level < 0 or to_level < 0:
-            print "Invalid Levels in {ID}".format(**params)
+            print("Invalid Levels in {ID}".format(**params)) 
             return entity
 
         value = "range({}, {})".format(from_level, to_level + 1)
@@ -576,7 +659,7 @@ class TextEncounter{ID}(TextEncounter):
         if isinstance(rule, dict) is True:
             rule = rule.get(entity)
         if rule is None:
-            print "There are no rule for tag {} in entity {}".format(tag, entity)
+            #print "There are no rule for tag {} in entity {}".format(tag, entity)
             continue
         action, key, format_string = rule
         entity = action(params, key, tag, indentation, entity, value, format_string)
@@ -620,6 +703,38 @@ def process_docx(docx_file_path, destination_dir):
 
     # text parsing text and creating script file
     process_text(text, destination_dir)
+    pass
+# ----------------- INTEGRATE TO MENGINE ----------------
+def parse_text(text):
+    # get nodes from text
+    all_nodes = parse_nodes2(text)
+    print ("***************", all_nodes)
+    nodes_by_encounters = split_nodes_by_encounters(all_nodes)
+    print ("^^^^^^^^^^^^^^^^^^^", nodes_by_encounters)
+    # transform nodes to files
+    scripts = []
+    all_texts = []
+    for nodes in nodes_by_encounters:
+        print ("############", nodes)
+        # te_id, script_text, texts = parse_data(nodes)
+        te_id, script_text, texts = parse_data_experiment(nodes)
+        # accumulate all texts
+        all_texts.append(texts)
+        # accumulate all scripts
+        scripts.append((te_id, script_text))
+        pass
+    texts = format_texts(all_texts)
+    print ("@@@@@@@@@@@@@", scripts, texts)
+    return scripts, texts
+    pass
+	
+def process(docx_file_path):
+    # gain text from docx
+    text = docx2txt.process(docx_file_path)
+    text = text.encode('utf-8')
+
+    # text parsing text and creating script file
+    return parse_text(text)
     pass
 # --------------------------------------------------------
 if __name__ == '__main__':
