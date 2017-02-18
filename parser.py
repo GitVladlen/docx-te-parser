@@ -136,24 +136,6 @@ def get_id_from_nodes(nodes):
 def parse_encounter_nodes(nodes):
     # todo: modify parsing alghoriphm
 
-    te_id = get_id_from_nodes(nodes)
-
-    params = dict(
-        ID=te_id,
-        InitParams="",
-        CheckConditions="",
-        GenerateDialog="",
-        Texts=[],
-        OptionIndex=0,
-        OutcomeIndex=0,
-    )
-
-    indentation = "        "
-    entity = "self"
-
-    option_index = 0
-    outcome_index = 0
-
     def rule_strip_space(params, key, tag, indentaion, entity, value, format_string):
         value = value.strip(" ")
         params[key] += format_string.format(
@@ -414,6 +396,24 @@ def parse_encounter_nodes(nodes):
         Items=(rule_items, "GenerateDialog", "\n{indentation}{entity}.items = {value}")
     )
 
+    te_id = get_id_from_nodes(nodes)
+
+    params = dict(
+        ID=te_id,
+        InitParams="",
+        CheckConditions="",
+        GenerateDialog="",
+        Texts=[],
+        OptionIndex=0,
+        OutcomeIndex=0,
+    )
+
+    indentation = "        "
+    entity = "self"
+
+    option_index = 0
+    outcome_index = 0
+
     for tag, value in nodes:
         rule = rules.get(tag)
         if rule is None:
@@ -430,6 +430,7 @@ def parse_encounter_nodes(nodes):
 
     script_text = script_format.format(**params)
 
+    # DEBUG
     script_text = add_debug_text(script_text, nodes, params["Texts"])
 
     return params["ID"], script_text, params["Texts"]
