@@ -107,6 +107,25 @@ def delete_comments_from_text(text):
     return ' '.join(result)
     pass
 
+def format_texts(all_texts):
+    all_texts_str_list = []
+    for texts in all_texts:
+        texts_str = "\n\t".join(map(lambda text: text_id_format.format(**text), texts))
+        all_texts_str_list.append(texts_str)
+    all_texts_str = "\n\n\t".join(all_texts_str_list)
+
+    texts_to_write = texts_format.format(Texts=all_texts_str)
+    return texts_to_write
+    pass
+
+def add_debug_text(script_text, nodes, texts):
+    """Add debug text as multi line comment to script text"""
+    nodes_str = "\n".join(map(lambda node: "{} = \"{}\"".format(node[0], node[1]), nodes))
+    texts_str = "\n".join(map(lambda text: text_id_format.format(**text), texts))
+    full_text = debug_text_format.format(script=script_text, nodes=nodes_str, texts=texts_str)
+    return full_text
+    pass
+
 def split_nodes_by_encounters(nodes):
     result = []
     cur_nodes = []
@@ -136,7 +155,76 @@ def get_id_from_nodes(nodes):
 def parse_encounter_nodes(nodes):
     # todo: modify parsing alghoriphm
 
-    def rule_strip_space(params, key, tag, indentaion, entity, value, format_string):
+    rules = dict(
+        ID=(rule_id, "InitParams", "\n{indentation}{entity}.id = \"{value}\""),
+        Name=(rule_strip_space, "InitParams", "\n{indentation}{entity}.name = \"{value}\""),
+        Conditions=(rule_conditions, None, None),
+        Planet=(rule_strip_space, "InitParams", "\n{indentation}{entity}.planet = \"{value}\""),
+        Levels=(rule_levels, "InitParams", "\n{indentation}{entity}.levels = {value}"),
+        Priority=(rule_int, "InitParams", "\n{indentation}{entity}.priority = {value}"),
+        Occurrence=(rule_occurrence, "InitParams", "\n{indentation}{entity}.occurrence = {value}"),
+        Frequency=(rule_int, "InitParams", "\n{indentation}{entity}.frequency = {value}"),
+        Mech1=dict(
+            self=(rule_mech1_conditions, None, None),
+            conditions=(rule_mech1_conditions, None, None),
+            outcome=(rule_mech1_outcome, None, None),
+        ),
+        Mech2=dict(
+            self=(rule_mech2_conditions, None, None),
+            conditions=(rule_mech2_conditions, None, None),
+            outcome=(rule_mech2_outcome, None, None),
+        ),
+        Cargo=(rule_cargo, None, None),
+        Dialog=(rule_dialog, "GenerateDialog", "\n{indentation}{entity}.text = \"{value}\""),
+        Option=(rule_option, "GenerateDialog", None),
+        Outcome=(rule_outcome, "GenerateDialog", None),
+        Chance=(rule_int, "GenerateDialog", "\n{indentation}{entity}.chance = {value}"),
+        Gips=(rule_gips, "GenerateDialog", "\n{indentation}{entity}.gips = {value}"),
+        Items=(rule_items, "GenerateDialog", "\n{indentation}{entity}.items = {value}")
+    )
+
+    te_id = get_id_from_nodes(nodes)
+
+    params = dict(
+        ID=te_id,
+        InitParams="",
+        CheckConditions="",
+        GenerateDialog="",
+        Texts=[],
+        OptionIndex=0,
+        OutcomeIndex=0,
+    )
+
+    indentation = "        "
+    entity = "self"
+
+    option_index = 0
+    outcome_index = 0
+
+    for tag, value in nodes:
+        rule = rules.get(tag)
+        if rule is None:
+            # print "There are no rule for tag {}".format(tag)
+            continue    
+        if isinstance(rule, dict) is True:
+            rule = rule.get(entity)
+        if rule is None:
+            #print "There are no rule for tag {} in entity {}".format(tag, entity)
+            continue
+        action, key, format_string = rule
+        entity = action(params, key, tag, indentation, entity, value.strip(), format_string)
+        pass
+
+    script_text = script_format.format(**params)
+
+    # DEBUG
+    script_text = add_debug_text(script_text, nodes, params["Texts"])
+
+    return params["ID"], script_text, params["Texts"]
+    pass
+
+# ----------------------------------- RULES -----------------------------------
+def rule_strip_space(params, key, tag, indentaion, entity, value, format_string):
         value = value.strip(" ")
         params[key] += format_string.format(
             indentation=indentation,
@@ -368,101 +456,6 @@ def parse_encounter_nodes(nodes):
         return entity
         pass
 
-    rules = dict(
-        ID=(rule_id, "InitParams", "\n{indentation}{entity}.id = \"{value}\""),
-        Name=(rule_strip_space, "InitParams", "\n{indentation}{entity}.name = \"{value}\""),
-        Conditions=(rule_conditions, None, None),
-        Planet=(rule_strip_space, "InitParams", "\n{indentation}{entity}.planet = \"{value}\""),
-        Levels=(rule_levels, "InitParams", "\n{indentation}{entity}.levels = {value}"),
-        Priority=(rule_int, "InitParams", "\n{indentation}{entity}.priority = {value}"),
-        Occurrence=(rule_occurrence, "InitParams", "\n{indentation}{entity}.occurrence = {value}"),
-        Frequency=(rule_int, "InitParams", "\n{indentation}{entity}.frequency = {value}"),
-        Mech1=dict(
-            self=(rule_mech1_conditions, None, None),
-            conditions=(rule_mech1_conditions, None, None),
-            outcome=(rule_mech1_outcome, None, None),
-        ),
-        Mech2=dict(
-            self=(rule_mech2_conditions, None, None),
-            conditions=(rule_mech2_conditions, None, None),
-            outcome=(rule_mech2_outcome, None, None),
-        ),
-        Cargo=(rule_cargo, None, None),
-        Dialog=(rule_dialog, "GenerateDialog", "\n{indentation}{entity}.text = \"{value}\""),
-        Option=(rule_option, "GenerateDialog", None),
-        Outcome=(rule_outcome, "GenerateDialog", None),
-        Chance=(rule_int, "GenerateDialog", "\n{indentation}{entity}.chance = {value}"),
-        Gips=(rule_gips, "GenerateDialog", "\n{indentation}{entity}.gips = {value}"),
-        Items=(rule_items, "GenerateDialog", "\n{indentation}{entity}.items = {value}")
-    )
-
-    te_id = get_id_from_nodes(nodes)
-
-    params = dict(
-        ID=te_id,
-        InitParams="",
-        CheckConditions="",
-        GenerateDialog="",
-        Texts=[],
-        OptionIndex=0,
-        OutcomeIndex=0,
-    )
-
-    indentation = "        "
-    entity = "self"
-
-    option_index = 0
-    outcome_index = 0
-
-    for tag, value in nodes:
-        rule = rules.get(tag)
-        if rule is None:
-            # print "There are no rule for tag {}".format(tag)
-            continue    
-        if isinstance(rule, dict) is True:
-            rule = rule.get(entity)
-        if rule is None:
-            #print "There are no rule for tag {} in entity {}".format(tag, entity)
-            continue
-        action, key, format_string = rule
-        entity = action(params, key, tag, indentation, entity, value.strip(), format_string)
-        pass
-
-    script_text = script_format.format(**params)
-
-    # DEBUG
-    script_text = add_debug_text(script_text, nodes, params["Texts"])
-
-    return params["ID"], script_text, params["Texts"]
-    pass
-
-def format_texts(all_texts):
-    all_texts_str_list = []
-    for texts in all_texts:
-        texts_str = "\n\t".join(map(lambda text: text_id_format.format(**text), texts))
-        all_texts_str_list.append(texts_str)
-    all_texts_str = "\n\n\t".join(all_texts_str_list)
-
-    texts_to_write = texts_format.format(Texts=all_texts_str)
-    return texts_to_write
-    pass
-
-def add_debug_text(script_text, nodes, texts):
-    """Add debug text as multi line comment to script text"""
-    debug_format = """{script}
-\"\"\" debug info
-------------- Nodes -------------
-{nodes}
-------------- Texts -------------
-{texts}
-\"\"\"
-"""
-    nodes_str = "\n".join(map(lambda node: "{} = \"{}\"".format(node[0], node[1]), nodes))
-    texts_str = "\n".join(map(lambda text: text_id_format.format(**text), texts))
-    full_text = debug_format.format(script=script_text, nodes=nodes_str, texts=texts_str)
-    return full_text
-    pass
-
 # ---------------------------- FORMAT STRINGS ----------------------------
 script_format = """from Game.TextEncounters.TextEncounter import TextEncounter
 
@@ -488,6 +481,15 @@ texts_format = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 """
 
 text_id_format = "<Text Key=\"{key}\" Value=\"{value}\"/>"
+
+debug_text_format = """{script}
+\"\"\" debug info
+------------- Nodes -------------
+{nodes}
+------------- Texts -------------
+{texts}
+\"\"\"
+"""
 
 # -------------------- STUFF FOR EXECUTE FROM PACKAGE (AS MAIN) --------------------
 def process_main(docx_file_name, destination_dir):
