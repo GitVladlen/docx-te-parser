@@ -4,53 +4,35 @@ import re
 import argparse
 
 import docx2txt
-# ---------------------------- FORMAT STRINGS ----------------------------
-script_format = """from Game.TextEncounters.TextEncounter import TextEncounter
 
+# ------------------------- USE THIS IN MENGINE -------------------------
+def process(docx_file_path):
+    # gain text from docx
+    text = docx2txt.process(docx_file_path)
+    text = text.encode('utf-8')
 
-class TextEncounter{ID}(TextEncounter):
-    def __init__(self):
-        super(TextEncounter{ID}, self).__init__(){InitParams}
-        pass
-
-    def _onCheckConditions(self, context):{CheckConditions}
-        return True
-        pass
-
-    def _onGenerate(self, context, dialog):{GenerateDialog}
-        pass
+    # text parsing text and creating script file
+    return parse_text(text)
     pass
-"""
-
-texts_format = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Texts>
-    {Texts}
-</Texts>
-"""
-
-text_id_format = "<Text Key=\"{key}\" Value=\"{value}\"/>"
-
+    
 # -------------------------------- UTILS --------------------------------
-def delete_comments(lines):
-    """Clear text from comments like //comment"""
-    result = []
-    for line in lines:
-        # delete comments from line
-        comment_index = line.find(b"//")
-        if comment_index is not -1:
-            line = line[:comment_index]
-        # ignore empty line
-        if not line:
-            continue
-        # add to result
-        result.append(line.decode())
-    return result
-
-def delete_comments_from_text(text):
-    lines = text.split(b'\n\n')
-    result = delete_comments(lines)
-
-    return ' '.join(result)
+def parse_text(text):
+    # get nodes from text
+    all_nodes = parse_nodes(text)
+    nodes_by_encounters = split_nodes_by_encounters(all_nodes)
+    # transform nodes to files
+    scripts = []
+    all_texts = []
+    for nodes in nodes_by_encounters:
+        # transform nodes into data
+        te_id, script_text, texts = parse_data(nodes)
+        # accumulate all texts
+        all_texts.append(texts)
+        # accumulate all scripts
+        scripts.append((te_id, script_text))
+        pass
+    texts = format_texts(all_texts)
+    return scripts, texts
     pass
 
 def parse_nodes(text):
@@ -100,6 +82,28 @@ def parse_nodes(text):
 
     nodes = list(zip(tags, values))
     return nodes
+    pass
+
+def delete_comments(lines):
+    """Clear text from comments like //comment"""
+    result = []
+    for line in lines:
+        # delete comments from line
+        comment_index = line.find(b"//")
+        if comment_index is not -1:
+            line = line[:comment_index]
+        # ignore empty line
+        if not line:
+            continue
+        # add to result
+        result.append(line.decode())
+    return result
+
+def delete_comments_from_text(text):
+    lines = text.split(b'\n\n')
+    result = delete_comments(lines)
+
+    return ' '.join(result)
     pass
 
 def format_texts(all_texts):
@@ -156,6 +160,7 @@ def get_id_from_nodes(nodes):
             return value
     return None
 
+# -------------------------------- NODES PARSING --------------------------------
 def parse_data(nodes):
     te_id = get_id_from_nodes(nodes)
 
@@ -455,34 +460,34 @@ def parse_data(nodes):
 
     return params["ID"], script_text, params["Texts"]
     pass
-# ----------------- INTEGRATE TO MENGINE ----------------
-def parse_text(text):
-    # get nodes from text
-    all_nodes = parse_nodes(text)
-    nodes_by_encounters = split_nodes_by_encounters(all_nodes)
-    # transform nodes to files
-    scripts = []
-    all_texts = []
-    for nodes in nodes_by_encounters:
-        te_id, script_text, texts = parse_data(nodes)
-        # accumulate all texts
-        all_texts.append(texts)
-        # accumulate all scripts
-        scripts.append((te_id, script_text))
+
+# ---------------------------- FORMAT STRINGS ----------------------------
+script_format = """from Game.TextEncounters.TextEncounter import TextEncounter
+
+
+class TextEncounter{ID}(TextEncounter):
+    def __init__(self):
+        super(TextEncounter{ID}, self).__init__(){InitParams}
         pass
-    texts = format_texts(all_texts)
-    return scripts, texts
-    pass
 
-def process(docx_file_path):
-    # gain text from docx
-    text = docx2txt.process(docx_file_path)
-    text = text.encode('utf-8')
+    def _onCheckConditions(self, context):{CheckConditions}
+        return True
+        pass
 
-    # text parsing text and creating script file
-    return parse_text(text)
+    def _onGenerate(self, context, dialog):{GenerateDialog}
+        pass
     pass
-# ----------------------------- STUFF FOR EXECUTE FROM PACKAGE (AS MAIN) -----------------------------
+"""
+
+texts_format = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Texts>
+    {Texts}
+</Texts>
+"""
+
+text_id_format = "<Text Key=\"{key}\" Value=\"{value}\"/>"
+
+# -------------------- STUFF FOR EXECUTE FROM PACKAGE (AS MAIN) --------------------
 def process_main(docx_file_name, destination_dir):
     texts_filename = os.path.join(destination_dir, "TextEncounterTexts.xml")
     register_filename = os.path.join(destination_dir, "te-register.txt")
@@ -527,6 +532,7 @@ def process_args():
         
     return args
     pass
+
 # ---------------------------------------------------------------------------------------------
 if __name__ == '__main__':
     # setup default file names
