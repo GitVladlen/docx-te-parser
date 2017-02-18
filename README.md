@@ -6,5 +6,5 @@ Tool for exporting TEs from .docx to Mengine. Also can be run from package.
 3. create xml with Text resources
 4. create Excel file with TE register
 # Based on
-- python-docx2txt https://github.com/ankushshah89/python-docx2txt
+python-docx2txt https://github.com/ankushshah89/python-docx2txt
 
