@@ -4,18 +4,6 @@ import docx2txt
 import re
 import argparse
 
-def process_args():
-    parser = argparse.ArgumentParser(
-        description="Export Text Encounter from docx file to Mengine"
-        )
-    parser.add_argument("docx", help="path of the docx file")
-    parser.add_argument("dest", help="path of destination directory")
-
-    args = parser.parse_args()
-        
-    return args
-    pass
-
 # ---------------------------- FORMAT STRINGS ----------------------------
 script_format = """from Game.TextEncounters.TextEncounter import TextEncounter
 
@@ -716,12 +704,64 @@ def process(docx_file_path):
     # text parsing text and creating script file
     return parse_text(text)
     pass
-# --------------------------------------------------------
+# ----------------------------- STUFF FOR EXECUTE FROM PACKAGE (AS MAIN) -----------------------------
+def process_main(docx_file_name, destination_dir):
+    texts_filename = os.path.join(destination_dir, "TextEncounterTexts.xml")
+    register_filename = os.path.join(destination_dir, "te-register.txt")
+
+    register_title_format = "|{ID:^8}|{Module:^16}|{TypeName:^20}|\n"
+    register_row_format = "|{ID:>8}|{Module:>16}|{TypeName:>20}|\n"
+    register_line_string = "=" * (8 + 16 + 20 + 4) + "\n"
+
+    scripts, texts = process(docx_file_name)
+
+    with open(texts_filename, "w") as f:
+            f.write(texts)
+    
+    with open(register_filename, "w") as register:
+        register.write(register_line_string)
+        register.write(register_title_format.format(ID="ID", Module="Module", TypeName="TypeName"))
+        register.write(register_line_string)
+
+        for r, (te_id, text) in enumerate(scripts, start=1):
+
+            type_name = "TextEncounter{}".format(te_id)
+            generateFilename = os.path.join(destination_dir, type_name + ".py")
+
+            with open(generateFilename, "w") as f:
+                f.write(text)
+
+            register.write(register_row_format.format(ID=te_id, Module="TextEncounter", TypeName=type_name))
+            pass
+        pass
+
+        register.write(register_line_string)
+    pass
+
+def process_args():
+    parser = argparse.ArgumentParser(
+        description="Export Text Encounter from docx file to Mengine"
+        )
+    parser.add_argument("--docx", help="path of the docx file")
+    parser.add_argument("--dest", help="path of destination directory")
+
+    args = parser.parse_args()
+        
+    return args
+    pass
+
 if __name__ == '__main__':
     # setup default file names
     cur_dir_path = os.path.dirname(__file__)
     destination_dir = os.path.join(cur_dir_path, "debug/")
     docx_file_name = os.path.join(destination_dir, "te-format.docx")
+
+    # check console args
+    args = process_args()
+    if args.docx and args.dest:
+        docx_file_name = args.docx
+        destination_dir = args.dest
+        pass
 
     if not os.path.exists(docx_file_name):
         print("File {} dose not exist.".format(docx_file_name))
@@ -736,27 +776,6 @@ if __name__ == '__main__':
             sys.exit(1)
         pass
 
-    # todo: fix process args
-    # check console args
-    # args = process_args()
-    # print "Command line arguments: {}".format(args)
-    # if args.docx is not None and args.dest is None:
-    #     if not os.path.exists(args.docx):
-    #         print("File {} dose not exist.".format(args.docx))
-    #         sys.exit(1)
-    #         pass
-    #     if not os.path.exists(args.dest):
-    #         try:
-    #             os.makedirs(args.dest)
-    #         except OSError:
-    #             print("Unable to create destination dir {}".format(args.dest))
-    #             sys.exit(1)
-    #         pass
-        
-    #     docx_file_name = args.docx
-    #     destination_dir = args.dest
-    #     pass
     # execute
-
-    process_docx(docx_file_name, destination_dir)
+    process_main(docx_file_name, destination_dir)
     pass
