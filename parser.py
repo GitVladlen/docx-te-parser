@@ -23,9 +23,9 @@ def parse_text(text):
     # transform nodes to files
     scripts = []
     all_texts = []
-    for nodes in nodes_by_encounters:
+    for encounter_nodes in nodes_by_encounters:
         # transform nodes into data
-        te_id, script_text, texts = parse_data(nodes)
+        te_id, script_text, texts = parse_encounter_nodes(encounter_nodes)
         # accumulate all texts
         all_texts.append(texts)
         # accumulate all scripts
@@ -108,7 +108,6 @@ def delete_comments_from_text(text):
     pass
 
 def split_nodes_by_encounters(nodes):
-    # todo: refactor to regex
     result = []
     cur_nodes = []
     for node in nodes:
@@ -124,35 +123,7 @@ def split_nodes_by_encounters(nodes):
     if cur_nodes:
         result.append(cur_nodes)
 
-    # print "".join(map(lambda (index, nodes): "{}. {}\n\n".format(index, nodes), enumerate(result)))
     return result
-    pass
-
-def format_texts(all_texts):
-    all_texts_str_list = []
-    for texts in all_texts:
-        texts_str = "\n\t".join(map(lambda text: text_id_format.format(**text), texts))
-        all_texts_str_list.append(texts_str)
-    all_texts_str = "\n\n\t".join(all_texts_str_list)
-
-    texts_to_write = texts_format.format(Texts=all_texts_str)
-    return texts_to_write
-    pass
-
-def add_debug_text(script_text, nodes, texts):
-    """Add debug text as multi line comment to script text"""
-    debug_format = """{script}
-\"\"\" debug info
-------------- Nodes -------------
-{nodes}
-------------- Texts -------------
-{texts}
-\"\"\"
-"""
-    nodes_str = "\n".join(map(lambda node: "{} = \"{}\"".format(node[0], node[1]), nodes))
-    texts_str = "\n".join(map(lambda text: text_id_format.format(**text), texts))
-    full_text = debug_format.format(script=script_text, nodes=nodes_str, texts=texts_str)
-    return full_text
     pass
 
 def get_id_from_nodes(nodes):
@@ -162,7 +133,7 @@ def get_id_from_nodes(nodes):
     return None
 
 # -------------------------------- NODES PARSING --------------------------------
-def parse_data(nodes):
+def parse_encounter_nodes(nodes):
     # todo: modify parsing alghoriphm
 
     te_id = get_id_from_nodes(nodes)
@@ -462,6 +433,33 @@ def parse_data(nodes):
     script_text = add_debug_text(script_text, nodes, params["Texts"])
 
     return params["ID"], script_text, params["Texts"]
+    pass
+
+def format_texts(all_texts):
+    all_texts_str_list = []
+    for texts in all_texts:
+        texts_str = "\n\t".join(map(lambda text: text_id_format.format(**text), texts))
+        all_texts_str_list.append(texts_str)
+    all_texts_str = "\n\n\t".join(all_texts_str_list)
+
+    texts_to_write = texts_format.format(Texts=all_texts_str)
+    return texts_to_write
+    pass
+
+def add_debug_text(script_text, nodes, texts):
+    """Add debug text as multi line comment to script text"""
+    debug_format = """{script}
+\"\"\" debug info
+------------- Nodes -------------
+{nodes}
+------------- Texts -------------
+{texts}
+\"\"\"
+"""
+    nodes_str = "\n".join(map(lambda node: "{} = \"{}\"".format(node[0], node[1]), nodes))
+    texts_str = "\n".join(map(lambda text: text_id_format.format(**text), texts))
+    full_text = debug_format.format(script=script_text, nodes=nodes_str, texts=texts_str)
+    return full_text
     pass
 
 # ---------------------------- FORMAT STRINGS ----------------------------
