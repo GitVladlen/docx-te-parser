@@ -482,6 +482,7 @@ texts_format = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 
 text_id_format = "<Text Key=\"{key}\" Value=\"{value}\"/>"
 
+# DEBUG
 debug_text_format = """{script}
 \"\"\" debug info
 ------------- Nodes -------------
