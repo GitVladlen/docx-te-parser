@@ -11,7 +11,7 @@ def process(docx_file_path):
     text = docx2txt.process(docx_file_path)
     text = text.encode('utf-8')
 
-    # text parsing text and creating script file
+    # gain scripts and text resources from docx text
     return parse_text(text)
     pass
 
