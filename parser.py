@@ -4,6 +4,7 @@ import re
 import argparse
 
 import docx2txt
+import nodes2script
 
 # ------------------------- USE THIS IN MENGINE -------------------------
 def process(docx_file_path):
@@ -25,7 +26,8 @@ def parse_text(text):
     all_texts = []
     for encounter_nodes in nodes_by_encounters:
         # transform nodes into data
-        te_id, script_text, texts = parse_encounter_nodes(encounter_nodes)
+        # te_id, script_text, texts = parse_encounter_nodes(encounter_nodes)
+        te_id, script_text, texts = nodes2script.parse_encounter_nodes(encounter_nodes)
         # accumulate all texts
         all_texts.append(texts)
         # accumulate all scripts
@@ -43,7 +45,7 @@ def parse_nodes(text):
         "ID",
         "Name",
         "Conditions",
-        "Planet",
+        "World",
         "Stages",
         "Stages",
         "Priority",
