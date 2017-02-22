@@ -325,7 +325,7 @@ class InitConditionOccurrence(ValueNode):
         self.params.update(dict(
             Value=None,
         ))
-        self.to_str_format = "self.occurence = {Value}"
+        self.to_str_format = "self.occurrence = {Value}"
 
     def _parse(self, value):
         match = re.match(r'(Reccuring|Resets|Until completed|Once only)', str(value))
