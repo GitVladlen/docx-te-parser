@@ -91,7 +91,6 @@ class ComplexNode(Node):
             if node.parse(value):
                 value = node
         self._add_param(key, value)
-        
 
     def addComplex(self, key, value, type_):
         complex_node = type_(self)
