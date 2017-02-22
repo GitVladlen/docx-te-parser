@@ -11,23 +11,23 @@ def parse_encounter_nodes(encounter_nodes):
     global _global_te_id
     global _global_texts
 
-    _global_te_id = None
+    _global_te_id = get_id_from_nodes(encounter_nodes)
     _global_texts = []
 
     cur_node = root
     for tag, value in encounter_nodes:
-        if tag == "ID":
-            _global_te_id = value.strip()
         try:
             cur_node = cur_node.push(tag, value.strip())
         except NoHandleTagException as ex:
             print(ex)
+            pass
 
     script_text = root.getScript()
 
-    print("=========================", _global_te_id)
-    print(script_text)
-    print("=========================")
+    # DEBUG
+    # print("=========================", _global_te_id)
+    # print(script_text)
+    # print("=========================")
 
     return _global_te_id, script_text, _global_texts
     pass
@@ -70,10 +70,10 @@ class ComplexNode(Node):
         result_node = self._push(tag, value)
         if result_node is None:
             if self.parent is None:
-                raise NoHandleTagException("Parent is None", type(self), tag, value)
+                raise NoHandleTagException("Parent is None", tag, value)
             result_node = self.parent.push(tag, value)
             if result_node is None:
-                raise NoHandleTagException("Parent can`t handle tag", type(self), tag, value)
+                raise NoHandleTagException("Parent can`t handle tag", tag, value)
         return result_node
 
     def _push(self, tag, value):
@@ -153,6 +153,8 @@ class TextEncounter{ID}(TextEncounter):
             self.addValue("InitConditions", value, InitConditionWorld)
         elif tag == "Stages":
             self.addValue("InitConditions", value, InitConditionStages)
+        elif tag == "Occurrence":
+            self.addValue("InitConditions", value, InitConditionOccurrence)
         elif tag == "Conditions":
             return self.addComplex("Conditions", value, Conditions)
         elif tag == "Dialog":
@@ -208,7 +210,6 @@ class Option(ComplexNode):
         {Conditions:if:option_conditions = [{Conditions:repeat:{{item}}}]
         if not all(option_conditions):
             dialog.options.remove(option)}
-        
         """
 
     def _push(self, tag, value):
@@ -328,6 +329,31 @@ class InitConditionStages(ValueNode):
         pass
 
 
+# =======================================================
+class InitConditionOccurrence(ValueNode):
+    def _onInit(self):
+        self.params.update(dict(
+            Value=None,
+        ))
+        self.to_str_format = "self.occurence = {Value}"
+
+    def _parse(self, value):
+        match = re.match(r'(Reccuring|Resets|Until completed|Once only)', str(value))
+
+        if not match:
+            return False
+        bones = {
+            "Reccuring": "self.OCCURRENCE_RECCURING",
+            "Resets": "self.OCCURRENCE_RESETS",
+            "Until completed": "self.OCCURRENCE_UNTIL_COMPLETED",
+            "Once only": "self.OCCURRENCE_ONCE_ONLY",
+        }
+        self.params["Value"] = bones[match.group(1)]
+
+        return True
+        pass
+
+
 # CONDITIONS ============================================
 class Conditions(ComplexNode):
     def _onInit(self):
@@ -387,15 +413,20 @@ class ConditionMech2(ConditionMechNode):
 
 # UTILS ===============================================
 # =====================================================
+def get_id_from_nodes(nodes):
+    for tag, value in nodes:
+        if tag == "ID":
+            return value.strip()
+    return None
+
 class NoHandleTagException(Exception):
-    def __init__(self, message, type_, tag, value):
+    def __init__(self, message, tag, value):
         self.message = message
-        self.type_ = type_
         self.tag = tag
         self.value = value
 
     def __str__(self):
-        return "TYPE='{ex.type_}' MESSAGE='{ex.message}' TAG='{ex.tag}' VALUE='{ex.value}'".format(ex=self)
+        return "[TAG EXCEPTION] MESSAGE='{ex.message}' TAG='{ex.tag}' VALUE='{ex.value}'".format(ex=self)
 
 
 # ======================================================
