@@ -29,6 +29,13 @@ def parse_encounter_nodes(encounter_nodes):
     # print(script_text)
     # print("=========================")
 
+    # clear sets of empty lines
+    matches = re.findall(r'\n((?:\s*\n){3,})', script_text)
+    if matches:
+        for match in matches:
+            print ("MATCH=[{}]".format(match))
+            script_text = script_text.replace(match, "\n", 1)
+
     return _global_te_id, script_text, _global_texts
     pass
 
@@ -95,6 +102,12 @@ class ComplexNode(Node):
     def addComplex(self, key, value, type_):
         complex_node = type_(self)
         if value:
+            # paragraph feature [br] -> &#10;
+            matches = re.findall(r'(\s?\[br\]\s?)', value)
+            if matches:
+                for match in matches:
+                    value = value.replace(match, "&#10;", 1)
+
             global _global_te_id
             global _global_texts
 
