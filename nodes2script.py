@@ -1,28 +1,35 @@
 import string
 import re
 
+_global_te_id = None
+_global_texts = []
 
 # MAIN =================================================
 # ======================================================
 def parse_encounter_nodes(encounter_nodes):
     root = Root(None)
+    global _global_te_id
+    global _global_texts
+
+    _global_te_id = None
+    _global_texts = []
 
     cur_node = root
     for tag, value in encounter_nodes:
+        if tag == "ID":
+            _global_te_id = value.strip()
         try:
             cur_node = cur_node.push(tag, value.strip())
         except NoHandleTagException as ex:
             print(ex)
 
     script_text = root.getScript()
-    te_id = root.getID()
-    text_resources = root.getTexts()
 
-    print("=========================", te_id)
+    print("=========================", _global_te_id)
     print(script_text)
     print("=========================")
 
-    return te_id, script_text, text_resources
+    return _global_te_id, script_text, _global_texts
     pass
 
 
@@ -89,7 +96,14 @@ class ComplexNode(Node):
     def addComplex(self, key, value, type_):
         complex_node = type_(self)
         if value:
-            complex_node.params["Text"] = value
+            global _global_te_id
+            global _global_texts
+
+            TextID = "ID_TE_{ID}_{index}".format(ID=_global_te_id, index=len(_global_texts))
+            TextValue = value
+            _global_texts.append(dict(key=TextID, value=TextValue))
+
+            complex_node.params["Text"] = TextID
         self._add_param(key, complex_node)
         return complex_node
 
@@ -102,7 +116,7 @@ class Root(ComplexNode):
             ID=None,
             Name=None,
             InitConditions=[],
-            Conditions=None,
+            Conditions=[],
             Dialog=None,
         ))
 # format string ---------------------------------------
@@ -114,10 +128,13 @@ class TextEncounter{ID}(TextEncounter):
         super(TextEncounter{ID}, self).__init__()
         self.id = "{ID}"
         self.name = "{Name}"
-{InitConditions:repeat:\n        {{item}}}
+        {InitConditions:repeat:\n        {{item}}}
         pass
 
-    def _onCheckConditions(self, context):{Conditions}
+    def _onCheckConditions(self, context):
+        {Conditions:if:conditions = [{Conditions:repeat:{{item}}}]
+        if not all(conditions):
+            return False}
         return True
         pass
 
@@ -133,11 +150,11 @@ class TextEncounter{ID}(TextEncounter):
         elif tag == "Name":
             self.addValue("Name", value)
         elif tag == "World":
-            self.addValue("InitConditions", value, World)
+            self.addValue("InitConditions", value, InitConditionWorld)
         elif tag == "Stages":
-            self.addValue("InitConditions", value, Stages)
+            self.addValue("InitConditions", value, InitConditionStages)
         elif tag == "Conditions":
-            return self.addComplex("Conditions", value, RootConditions)
+            return self.addComplex("Conditions", value, Conditions)
         elif tag == "Dialog":
             return self.addComplex("Dialog", value, Dialog)
         else:
@@ -151,11 +168,128 @@ class TextEncounter{ID}(TextEncounter):
         return self.params.get("ID")
 
     def getTexts(self):
-        return []
+        return self.texts
 
 
 # ======================================================
-class World(ValueNode):
+class Dialog(ComplexNode):
+    def _onInit(self):
+        self.params.update(dict(
+            Text = None,
+            Options = [],
+            Outcome = None,
+        ))    
+        self.to_str_format = """
+        dialog.text = "{Text}"
+        {Outcome:if:{Outcome}}{Options:if:{Options:repeat:{{item}}}}"""
+        
+    def _push(self, tag, value):
+        if tag == "Option":
+            return self.addComplex("Options", value, Option)
+        elif tag == "Outcome":
+            return self.addComplex("Outcome", value, DialogOutcome)
+        else:
+            return None
+        return self
+
+
+# =====================================================
+class Option(ComplexNode):
+    def _onInit(self):
+        self.params.update(dict(
+            Text = None,
+            Conditions = [],
+            Outcomes = [],
+        ))
+        self.to_str_format = """
+        option = dialog.option()
+        option.text = "{Text}"
+        {Outcomes:repeat:{{item}}}
+        {Conditions:if:option_conditions = [{Conditions:repeat:{{item}}}]
+        if not all(option_conditions):
+            dialog.options.remove(option)}
+        
+        """
+
+    def _push(self, tag, value):
+        if tag == "Conditions":
+            return self.addComplex("Conditions", value, Conditions)
+        if tag == "Outcome":
+            return self.addComplex("Outcomes", value, OptionOutcome)
+        else:
+            return None
+        return self
+
+
+# =====================================================
+class OutcomeNode(ComplexNode):
+    def _onInit(self):
+        self.params.update(dict(
+            Text = None,
+            Conditions = [],
+            Gips = None,
+        ))
+
+    def _push(self, tag, value):
+        if tag == "Gips":
+            self.addValue("Gips", value, OutcomeGips)
+        elif tag == "Conditions":
+            return self.addComplex("Conditions", value, Conditions)
+        else:
+            return None
+        return self
+
+
+# =====================================================
+class OptionOutcome(OutcomeNode):
+    def _onInit(self):
+        super(OptionOutcome, self)._onInit()
+        self.to_str_format = """
+        outcome = option.outcome()
+        {Text:if:outcome.text = "{Text}"}{Gips:if:{Gips}}
+
+        {Conditions:if:outcome_conditions = [{Conditions:repeat:{{item}}}]
+        if not all(outcome_conditions):
+            option.outcomes.remove(outcome)}
+        """
+
+
+# =====================================================
+class DialogOutcome(OutcomeNode):
+    def _onInit(self):
+        super(DialogOutcome, self)._onInit()
+        self.to_str_format = """
+        outcome = dialog.outcome()
+        {Text:if:outcome.text = "{Text}"}{Gips:if:{Gips}}
+
+        {Conditions:if:outcome_conditions = [{Conditions:repeat:{{item}}}]
+        if not all(outcome_conditions):
+            dialog.outcome = None}
+        """
+
+
+# OUTCOMES ============================================
+class OutcomeGips(ValueNode):
+    def _onInit(self):
+        self.params["Value"] = None
+        self.to_str_format = "\n        outcome.gips = {Value}\n"
+
+    def _parse(self, value):
+        rand_match = re.match(r'rand\s*[+-]?(\d+)\s+[+-]?(\d+)', str(value))
+        int_match = re.match(r'[+-]?(\d+)', str(value))
+        if rand_match:
+            from_, to_ = rand_match.groups()
+            self.params["Value"] = "self.rand({}, {})".format(from_, to_)
+        elif int_match:
+            int_value = int_match.group(1)
+            self.params["Value"] = int_value
+        else:
+            return False
+        return True
+
+
+# INIT CONDITIONS ======================================
+class InitConditionWorld(ValueNode):
     def _onInit(self):
         self.params["World"] = None
         self.to_str_format = "self.world = \"{World}\""
@@ -164,8 +298,9 @@ class World(ValueNode):
         self.params["World"] = value
         return True
 
+
 # ======================================================
-class Stages(ValueNode):
+class InitConditionStages(ValueNode):
     def _onInit(self):
         self.params.update(dict(
             From=None,
@@ -193,35 +328,34 @@ class Stages(ValueNode):
         pass
 
 
-# ======================================================
-class RootConditions(ComplexNode):
+# CONDITIONS ============================================
+class Conditions(ComplexNode):
     def _onInit(self):
         self.params.update(dict(
             Mech1 = None,
+            Mech2 = None,
         ))
-# format string ----------------------------------------
-        self.to_str_format = """
-{Mech1}
-"""
-# ------------------------------------------------------
+        self.to_str_format = "{Mech1:if:{Mech1}}{Mech2:if:{Mech2}}"
+
     def _push(self, tag, value):
         if tag == "Mech1":
             self.addValue("Mech1", value, ConditionMech1)
+        elif tag == "Mech2":
+            self.addValue("Mech2", value, ConditionMech2)
         else:
             return None
         return self
 
+
 # ======================================================
-class ConditionMech1(ValueNode):
+class ConditionMechNode(ValueNode):
     def _onInit(self):
         self.params.update(dict(
             Items = [],
+            MechObjectName = None,
         ))
-# format string ----------------------------------------
-        self.to_str_format = """
-{Items:repeat:        if not context.mech1.{{item}}:\n            return False\n}
-"""
-# ------------------------------------------------------
+        self.to_str_format = "{Items:repeat:\n            context.{MechObjectName}.{{item}},}"
+
     def _parse(self, value):
         matches = re.findall(r'(HP|TAP|HE)\s*(>|>=|<|<=|==|!=)\s*(\d+)', value)
         if not matches:
@@ -236,92 +370,19 @@ class ConditionMech1(ValueNode):
             self.params["Items"].append(format_string.format(**bones))
         return True
 
+
 # ======================================================
-class Dialog(ComplexNode):
+class ConditionMech1(ConditionMechNode):
     def _onInit(self):
-        self.params.update(dict(
-            Text = None,
-            Options = [],
-        ))
-# format string ---------------------------------------        
-        self.to_str_format = """
-        dialog.text = "{Text}"
-{Options:repeat:{{item}}}
-"""
-# -----------------------------------------------------
-        
-    def _push(self, tag, value):
-        if tag == "Option":
-            return self.addComplex("Options", value, Option)
-        else:
-            return None
-        return self
+        super(ConditionMech1, self)._onInit()
+        self.params["MechObjectName"] = "mech1"
 
 
-# =====================================================
-class Option(ComplexNode):
+# ======================================================
+class ConditionMech2(ConditionMechNode):
     def _onInit(self):
-        self.params.update(dict(
-            Text = None,
-            Outcomes = [],
-        ))
-# format string ---------------------------------------
-        self.to_str_format = """
-        option = dialog.option()
-        option.text = "{Text}"
-{Outcomes:repeat:{{item}}}
-"""
-# -----------------------------------------------------
-
-    def _push(self, tag, value):
-        if tag == "Outcome":
-            return self.addComplex("Outcomes", value, Outcome)
-        else:
-            return None
-        return self
-
-
-# =====================================================
-class Outcome(ComplexNode):
-    def _onInit(self):
-        self.params.update(dict(
-            Text = None,
-            Gips = None,
-        ))
-# format string ---------------------------------------
-        self.to_str_format = """
-        outcome = option.outcome()
-        outcome.text = "{Text}"
-        {Gips}
-"""
-# -----------------------------------------------------
-
-    def _push(self, tag, value):
-        if tag == "Gips":
-            self.addValue("Gips", value, OutcomeGips)
-        else:
-            return None
-        return self
-
-
-# =====================================================
-class OutcomeGips(ValueNode):
-    def _onInit(self):
-        self.params["Value"] = None
-        self.to_str_format = "outcome.gips = {Value}"
-
-    def _parse(self, value):
-        rand_match = re.match(r'rand\s*[+-]?(\d+)\s+[+-]?(\d+)', str(value))
-        int_match = re.match(r'[+-]?(\d+)', str(value))
-        if rand_match:
-            from_, to_ = rand_match.groups()
-            self.params["Value"] = "self.rand({}, {})".format(from_, to_)
-        elif int_match:
-            int_value = int_match.group(1)
-            self.params["Value"] = int_value
-        else:
-            return False
-        return True
+        super(ConditionMech2, self)._onInit()
+        self.params["MechObjectName"] = "mech2"
 
 
 # UTILS ===============================================
