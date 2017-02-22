@@ -7,13 +7,13 @@ _global_texts = []
 # MAIN =================================================
 # ======================================================
 def parse_encounter_nodes(encounter_nodes):
-    root = Root(None)
     global _global_te_id
     global _global_texts
 
     _global_te_id = get_id_from_nodes(encounter_nodes)
     _global_texts = []
 
+    root = Root(None)
     cur_node = root
     for tag, value in encounter_nodes:
         try:
@@ -22,7 +22,7 @@ def parse_encounter_nodes(encounter_nodes):
             print(ex)
             pass
 
-    script_text = root.getScript()
+    script_text = str(root)
 
     # DEBUG
     # print("=========================", _global_te_id)
@@ -162,15 +162,6 @@ class TextEncounter{ID}(TextEncounter):
         else:
             return None
         return self
-
-    def getScript(self):
-        return str(self)
-
-    def getID(self):
-        return self.params.get("ID")
-
-    def getTexts(self):
-        return self.texts
 
 
 # ======================================================
