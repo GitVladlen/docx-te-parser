@@ -149,7 +149,7 @@ class TextEncounter{ID}(TextEncounter):
         return True
         pass
 
-    def _onGenerate(self, context, dialog):{Dialog}
+    def _onGenerate(self, context, dialog):{Dialog:if:{Dialog}}
         pass
     pass
 """
@@ -184,8 +184,7 @@ class Dialog(ComplexNode):
             Outcome = None,
         ))    
         self.to_str_format = """
-        dialog.text = "{Text}"
-        {Outcome:if:{Outcome}}{Options:if:{Options:repeat:{{item}}}}"""
+        {Text:if:dialog.text = "{Text}"}{Outcome:if:{Outcome}}{Options:if:{Options:repeat:{{item}}}}"""
         
     def _push(self, tag, value):
         if tag == "Option":
@@ -231,11 +230,14 @@ class OutcomeNode(ComplexNode):
             Text = None,
             Conditions = [],
             Gips = None,
+            Combat = None,
         ))
 
     def _push(self, tag, value):
         if tag == "Gips":
             self.addValue("Gips", value, OutcomeGips)
+        if tag == "Combat":
+            return self.addComplex("Combat", value, OutcomeCombat)
         elif tag == "Conditions":
             return self.addComplex("Conditions", value, Conditions)
         else:
@@ -263,7 +265,7 @@ class DialogOutcome(OutcomeNode):
         super(DialogOutcome, self)._onInit()
         self.to_str_format = """
         outcome = dialog.outcome()
-        {Text:if:outcome.text = "{Text}"}{Gips:if:{Gips}}
+        {Text:if:outcome.text = "{Text}"}{Gips:if:{Gips}}{Combat:if:{Combat}}
 
         {Conditions:if:outcome_conditions = [{Conditions:repeat:{{item}}}]
         if not all(outcome_conditions):
@@ -288,6 +290,60 @@ class OutcomeGips(ValueNode):
             self.params["Value"] = int_value
         else:
             return False
+        return True
+
+# =====================================================
+class OutcomeCombat(ComplexNode):
+    def _onInit(self):
+        self.params.update(dict(
+            Enemy1=None,
+            Enemy2=None,
+        ))
+        self.to_str_format = """
+        combat = outcome.combat()
+        {Enemy1:if:{Enemy1}}{Enemy2:if:{Enemy2}}
+        """
+
+    def _push(self, tag, value):
+        if tag == "Enemy1":
+            self.addValue("Enemy1", value, OutcomeCombatEnemy)
+        elif tag == "Enemy2":
+            self.addValue("Enemy2", value, OutcomeCombatEnemy)
+        else:
+            return None
+        return self
+
+
+# =====================================================
+class OutcomeCombatEnemy(ValueNode):
+    def _onInit(self):
+        self.params.update(dict(
+            Prototype=None,
+            Stats=[],
+        ))
+        self.to_str_format = """
+        enemy = combat.enemy()
+        {Prototype:if:enemy.prototype = "{Prototype}"}{Stats:repeat:{{item}}}
+        """
+
+    def _parse(self, value):
+        prototype_match = re.match(r'\s*(\w+)\s*', value)
+        if not prototype_match:
+            return False
+        self.params["Prototype"] = prototype_match.group()
+
+        stats_matches = re.findall(r'(HP|TAP|HE|HPP|TAPP|HEP|HPX|TAPX|HEX|HPXP|TAPXP|HEXP)\s*(\+=|-=|=)\s*([+-]?\d+)', value)
+        if stats_matches:
+            stat_format = "\n        enemy.stats.append((\"{stat}\", \"{mod}\", {number}))"
+
+            for stat, mod, number in stats_matches:
+                dict_mod = {
+                    "+=": "plus",
+                    "-=": "minus",
+                    "=": "equal",
+                }
+                params = dict(stat=stat, mod=dict_mod.get(mod), number=number)
+                self.params["Stats"].append(stat_format.format(**params))
         return True
 
 
