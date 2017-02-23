@@ -33,7 +33,6 @@ def parse_encounter_nodes(encounter_nodes):
     matches = re.findall(r'\n((?:\s*\n){3,})', script_text)
     if matches:
         for match in matches:
-            print ("MATCH=[{}]".format(match))
             script_text = script_text.replace(match, "\n", 1)
 
     return _global_te_id, script_text, _global_texts
