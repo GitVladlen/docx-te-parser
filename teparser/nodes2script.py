@@ -231,7 +231,17 @@ class OutcomeNode(ComplexNode):
             Conditions = [],
             Gips = None,
             Combat = None,
+            Diff1 = None,
+            Diff2 = None,
         ))
+        self.to_str_format = """
+        outcome = {Diff1}.outcome()
+        {Text:if:outcome.text = "{Text}"}{Gips:if:{Gips}}{Combat:if:{Combat}}
+
+        {Conditions:if:outcome_conditions = [{Conditions:repeat:{{item}}}]
+        if not all(outcome_conditions):
+            {Diff2}}
+        """
 
     def _push(self, tag, value):
         if tag == "Gips":
@@ -249,28 +259,20 @@ class OutcomeNode(ComplexNode):
 class OptionOutcome(OutcomeNode):
     def _onInit(self):
         super(OptionOutcome, self)._onInit()
-        self.to_str_format = """
-        outcome = option.outcome()
-        {Text:if:outcome.text = "{Text}"}{Gips:if:{Gips}}
-
-        {Conditions:if:outcome_conditions = [{Conditions:repeat:{{item}}}]
-        if not all(outcome_conditions):
-            option.outcomes.remove(outcome)}
-        """
+        self.params.update(dict(
+            Diff1 = "option",
+            Diff2 = "option.outcomes.remove(outcome)",
+        ))
 
 
 # =====================================================
 class DialogOutcome(OutcomeNode):
     def _onInit(self):
         super(DialogOutcome, self)._onInit()
-        self.to_str_format = """
-        outcome = dialog.outcome()
-        {Text:if:outcome.text = "{Text}"}{Gips:if:{Gips}}{Combat:if:{Combat}}
-
-        {Conditions:if:outcome_conditions = [{Conditions:repeat:{{item}}}]
-        if not all(outcome_conditions):
-            dialog.outcome = None}
-        """
+        self.params.update(dict(
+            Diff1 = "dialog",
+            Diff2 = "dialog.dialog_outcome = None",
+        ))
 
 
 # OUTCOMES ============================================
